@@ -1,15 +1,31 @@
 {
-  "name": "qrius-capstone-nirojthapa",
+  "name": "qrius-capstone-yourname",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "description": "Qrius Capstone - Playwright + TypeScript test suite for Dai Hire Me",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui-only": "playwright test tests/ui",
+    "test:api-only": "playwright test tests/api",
+    "test:db-only": "playwright test tests/db",
+    "test:security-only": "playwright test tests/security",
+    "test:a11y-only": "playwright test tests/accessibility",
+    "test:perf-only": "playwright test tests/performance",
+    "k6:jobs": "k6 run performance/jobs-load-test.ts",
+    "k6:auth": "k6 run performance/auth-load-test.ts",
+    "report": "playwright show-report test-results/html-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["qrius", "capstone", "playwright", "qa", "automation"],
+  "author": "Your Name",
+  "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "^1.65.1",
-    "@types/node": "^26.6.10"
+    "@axe-core/playwright": "^4.8.0",
+    "@playwright/test": "^1.46.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "typescript": "^5.5.0"
   }
 }
