@@ -1,0 +1,63 @@
+import { TEST_PREFIX } from './env';
+
+let counter = 0;
+
+/** Unique within and across parallel workers and runs. */
+export function uniqueId(): string {
+  counter += 1;
+  return `${Date.now().toString(36)}${process.pid}${counter}`;
+}
+
+export const DEFAULT_PASSWORD = 'Test@123';
+
+export interface NewUser {
+  full_name: string;
+  email: string;
+  password: string;
+  role: string;
+  company?: string;
+  phone?: string;
+}
+
+export function makeUser(role: string = 'jobseeker', overrides: Partial<NewUser> = {}): NewUser {
+  const id = uniqueId();
+  return {
+    full_name: `${TEST_PREFIX}${role}_${id}`,
+    email: `${TEST_PREFIX}${role}_${id}@example.com`,
+    password: DEFAULT_PASSWORD,
+    role,
+    ...(role === 'employer' ? { company: `${TEST_PREFIX}Company_${id}` } : {}),
+    ...overrides,
+  };
+}
+
+export interface NewJob {
+  title: string;
+  company: string;
+  location: string;
+  job_type: string;
+  category: string;
+  description: string;
+  requirements: string;
+  salary_min?: number;
+  salary_max?: number;
+  status?: string;
+  deadline?: string;
+  employer_id?: number;
+}
+
+export function makeJob(overrides: Partial<NewJob> = {}): NewJob {
+  const id = uniqueId();
+  return {
+    title: `${TEST_PREFIX}QA Engineer ${id}`,
+    company: `${TEST_PREFIX}Company`,
+    location: 'Kathmandu',
+    job_type: 'full-time',
+    category: 'Quality Assurance',
+    description: 'Test description for an automated job posting.',
+    requirements: 'Test requirements for an automated job posting.',
+    salary_min: 40000,
+    salary_max: 60000,
+    ...overrides,
+  };
+}
