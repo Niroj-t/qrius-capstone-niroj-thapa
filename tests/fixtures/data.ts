@@ -2,7 +2,6 @@ import { TEST_PREFIX } from './env';
 
 let counter = 0;
 
-/** Unique within and across parallel workers and runs. */
 export function uniqueId(): string {
   counter += 1;
   return `${Date.now().toString(36)}${process.pid}${counter}`;

@@ -1,5 +1,3 @@
-/** Response shapes of the Dai Hire Me API (see API_Documentation.html). */
-
 export interface UserDto {
   id: number;
   full_name: string;
@@ -42,7 +40,6 @@ export interface ApplicationDto {
   cover_letter: string | null;
 }
 
-/** `total` is typed nullable on purpose: BUG-03 returns null. */
 export interface ApplicationListResponse {
   applications?: ApplicationDto[];
   total: number | null;

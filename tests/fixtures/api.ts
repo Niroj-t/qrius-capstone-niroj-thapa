@@ -5,7 +5,6 @@ import type { ApplicationDto, AuthResponse, JobDto, UserDto } from './types';
 
 export { expect };
 
-/** Seed accounts from db_seed.sql. All use the password Test@123. */
 export type SeedRole = 'admin' | 'employer' | 'employer2' | 'jobseeker';
 
 export const SEED_CREDENTIALS: Record<SeedRole, { email: string; password: string }> = {
@@ -16,9 +15,7 @@ export const SEED_CREDENTIALS: Record<SeedRole, { email: string; password: strin
 };
 
 export interface CallOptions {
-  /** Use the cached token of a seed account. */
   role?: SeedRole;
-  /** Use an explicit token (for example a freshly registered user). */
   token?: string;
   data?: unknown;
 }
@@ -32,7 +29,6 @@ export async function json<T>(res: APIResponse): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Thin wrapper around Playwright's request context for the /api routes. */
 export class ApiClient {
   constructor(
     private readonly request: APIRequestContext,
@@ -61,14 +57,12 @@ export class ApiClient {
     return this.call('DELETE', path, opts);
   }
 
-  /** id of a seed account, read through /auth/me. */
   async seedUserId(role: SeedRole): Promise<number> {
     const res = await this.get('/auth/me', { role });
     expect(res.status(), `GET /auth/me as ${role}`).toBe(200);
     return (await json<UserDto>(res)).id;
   }
 
-  /** Registers a new prefixed user and returns it with id and token. */
   async registerUser(role: string = 'jobseeker', overrides: Partial<NewUser> = {}): Promise<RegisteredUser> {
     const payload = makeUser(role, overrides);
     const res = await this.post('/auth/register', { data: payload });
@@ -77,14 +71,12 @@ export class ApiClient {
     return { ...payload, id: body.user.id, token: body.token };
   }
 
-  /** Creates a prefixed job through the API and returns it. */
   async createJob(overrides: Partial<NewJob> = {}, role: SeedRole = 'employer'): Promise<JobDto> {
     const res = await this.post('/jobs', { role, data: makeJob(overrides) });
     expect(res.status(), 'create job helper').toBe(201);
     return (await json<{ job: JobDto }>(res)).job;
   }
 
-  /** Applies to a job as the given user and returns the application. */
   async apply(jobId: number, token: string, coverLetter = 'Hello'): Promise<ApplicationDto> {
     const res = await this.post('/applications', { token, data: { job_id: jobId, cover_letter: coverLetter } });
     expect(res.status(), 'apply helper').toBe(201);
@@ -100,7 +92,6 @@ interface TestFixtures {
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  // Logs in once per worker for every seed role.
   tokens: [
     async ({ playwright }, use) => {
       const ctx = await playwright.request.newContext({ baseURL: BASE_URL });
