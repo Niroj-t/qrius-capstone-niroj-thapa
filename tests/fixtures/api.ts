@@ -68,6 +68,10 @@ export class ApiClient {
     return this.seeds[role].id;
   }
 
+  seedToken(role: SeedRole): string {
+  return this.seeds[role].token;
+}
+
   async registerUser(
     role: 'jobseeker' | 'employer' = 'jobseeker',
     overrides: Partial<NewUser> = {},

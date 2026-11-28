@@ -4,6 +4,8 @@ dotenv.config();
 
 export const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
+export const JWT_SECRET = process.env.JWT_SECRET;
+
 export const TEST_PREFIX = process.env.TEST_PREFIX ?? 'test_niroj_';
 
 export const DB_CONFIG = {
