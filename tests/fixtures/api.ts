@@ -1,23 +1,29 @@
 import { test as base, expect, type APIRequestContext, type APIResponse } from '@playwright/test';
 import { BASE_URL } from './env';
-import { makeJob, makeUser, type NewJob, type NewUser } from './data';
-import type { ApplicationDto, AuthResponse, JobDto, UserDto } from './types';
+import { DEFAULT_PASSWORD, makeJob, makeUser, type NewJob, type NewUser } from './data';
+import type { ApplicationDto, AuthResponse, JobDto } from './types';
 
 export { expect };
 
 export type SeedRole = 'admin' | 'employer' | 'employer2' | 'jobseeker';
 
 export const SEED_CREDENTIALS: Record<SeedRole, { email: string; password: string }> = {
-  admin: { email: 'admin@daihireme.com', password: 'Test@123' },
-  employer: { email: 'sita@techcorp.com', password: 'Test@123' },
-  employer2: { email: 'ramesh@leapfrog.com', password: 'Test@123' },
-  jobseeker: { email: 'ram@gmail.com', password: 'Test@123' },
+  admin: { email: 'admin@daihireme.com', password: DEFAULT_PASSWORD },
+  employer: { email: 'sita@techcorp.com', password: DEFAULT_PASSWORD },
+  employer2: { email: 'ramesh@leapfrog.com', password: DEFAULT_PASSWORD },
+  jobseeker: { email: 'ram@gmail.com', password: DEFAULT_PASSWORD },
 };
+
+export interface SeedSession {
+  id: number;
+  token: string;
+}
 
 export interface CallOptions {
   role?: SeedRole;
   token?: string;
   data?: unknown;
+  params?: Record<string, string | number | boolean>;
 }
 
 export interface RegisteredUser extends NewUser {
@@ -32,15 +38,16 @@ export async function json<T>(res: APIResponse): Promise<T> {
 export class ApiClient {
   constructor(
     private readonly request: APIRequestContext,
-    private readonly tokens: Record<SeedRole, string>,
+    private readonly seeds: Record<SeedRole, SeedSession>,
   ) {}
 
   call(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, opts: CallOptions = {}): Promise<APIResponse> {
-    const token = opts.token ?? (opts.role ? this.tokens[opts.role] : undefined);
+    const token = opts.token ?? (opts.role ? this.seeds[opts.role].token : undefined);
     return this.request.fetch(`/api${path}`, {
       method,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       data: opts.data,
+      params: opts.params,
     });
   }
 
@@ -57,13 +64,14 @@ export class ApiClient {
     return this.call('DELETE', path, opts);
   }
 
-  async seedUserId(role: SeedRole): Promise<number> {
-    const res = await this.get('/auth/me', { role });
-    expect(res.status(), `GET /auth/me as ${role}`).toBe(200);
-    return (await json<UserDto>(res)).id;
+  seedId(role: SeedRole): number {
+    return this.seeds[role].id;
   }
 
-  async registerUser(role: string = 'jobseeker', overrides: Partial<NewUser> = {}): Promise<RegisteredUser> {
+  async registerUser(
+    role: 'jobseeker' | 'employer' = 'jobseeker',
+    overrides: Partial<NewUser> = {},
+  ): Promise<RegisteredUser> {
     const payload = makeUser(role, overrides);
     const res = await this.post('/auth/register', { data: payload });
     expect(res.status(), 'register helper').toBe(201);
@@ -85,29 +93,35 @@ export class ApiClient {
 }
 
 interface WorkerFixtures {
-  tokens: Record<SeedRole, string>;
+  seeds: Record<SeedRole, SeedSession>;
 }
 interface TestFixtures {
   api: ApiClient;
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  tokens: [
+  seeds: [
     async ({ playwright }, use) => {
       const ctx = await playwright.request.newContext({ baseURL: BASE_URL });
-      const tokens = {} as Record<SeedRole, string>;
-      for (const role of Object.keys(SEED_CREDENTIALS) as SeedRole[]) {
-        const res = await ctx.post('/api/auth/login', { data: SEED_CREDENTIALS[role] });
-        expect(res.status(), `seed login as ${role}`).toBe(200);
-        tokens[role] = (await json<AuthResponse>(res)).token;
+      try {
+        const roles = Object.keys(SEED_CREDENTIALS) as SeedRole[];
+        const entries = await Promise.all(
+          roles.map(async (role) => {
+            const res = await ctx.post('/api/auth/login', { data: SEED_CREDENTIALS[role] });
+            expect(res.status(), `seed login as ${role}`).toBe(200);
+            const { token, user } = await json<AuthResponse>(res);
+            return [role, { id: user.id, token }] as const;
+          }),
+        );
+        await use(Object.fromEntries(entries) as Record<SeedRole, SeedSession>);
+      } finally {
+        await ctx.dispose();
       }
-      await ctx.dispose();
-      await use(tokens);
     },
     { scope: 'worker' },
   ],
 
-  api: async ({ request, tokens }, use) => {
-    await use(new ApiClient(request, tokens));
+  api: async ({ request, seeds }, use) => {
+    await use(new ApiClient(request, seeds));
   },
 });

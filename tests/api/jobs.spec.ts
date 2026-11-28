@@ -1,53 +1,55 @@
 import { test, expect, json } from '../fixtures/api';
-import { makeJob, uniqueId } from '../fixtures/data';
-import { TEST_PREFIX } from '../fixtures/env';
+import { makeJob, uniqueCategory, NON_EXISTENT_ID } from '../fixtures/data';
 import type { JobDto, JobListResponse } from '../fixtures/types';
 
 test.describe('API - jobs', () => {
   test('TC_API_12 list jobs with paging', async ({ api }) => {
-    const res = await api.get('/jobs?page=1&limit=3');
-    expect(res.status()).toBe(200);
+    const res = await api.get('/jobs', { params: { page: 1, limit: 3 } });
+    expect(res.status(), 'status').toBe(200);
     const body = await json<JobListResponse>(res);
-    expect(Array.isArray(body.jobs)).toBe(true);
-    expect(body.jobs.length).toBeLessThanOrEqual(3);
-    expect(body.page).toBe(1);
-    expect(body.limit).toBe(3);
-    expect(body.total).toBeGreaterThanOrEqual(body.jobs.length);
+    expect.soft(Array.isArray(body.jobs), 'jobs is a list').toBe(true);
+    expect.soft(body.jobs.length, 'jobs returned').toBeLessThanOrEqual(3);
+    expect.soft(body.page, 'page').toBe(1);
+    expect.soft(body.limit, 'limit').toBe(3);
+    expect.soft(body.total, 'total').toBeGreaterThanOrEqual(body.jobs.length);
   });
 
   test('TC_API_13 filter and sort jobs', async ({ api }) => {
-    const category = `${TEST_PREFIX}cat_${uniqueId()}`;
+    const category = uniqueCategory();
     await api.createJob({ category, job_type: 'contract', salary_min: 50000, salary_max: 100000 });
     await api.createJob({ category, job_type: 'full-time', salary_min: 150000, salary_max: 200000 });
 
     const filtered = await json<JobListResponse>(
-      await api.get(`/jobs?category=${encodeURIComponent(category)}&job_type=contract`),
+      await api.get('/jobs', { params: { category, job_type: 'contract' } }),
     );
     expect.soft(filtered.total, 'contract filter total').toBe(1);
-    expect.soft(filtered.jobs[0]?.job_type).toBe('contract');
+    expect.soft(filtered.jobs[0]?.job_type, 'filtered job type').toBe('contract');
 
-    const sorted = await json<JobListResponse>(
-      await api.get(`/jobs?category=${encodeURIComponent(category)}&sort=salary_high`),
-    );
-    expect(sorted.jobs.map((j) => j.salary_max)).toEqual([200000, 100000]);
+    const sorted = await json<JobListResponse>(await api.get('/jobs', { params: { category, sort: 'salary_high' } }));
+    expect
+      .soft(
+        sorted.jobs.map((j) => j.salary_max),
+        'salary_high order',
+      )
+      .toEqual([200000, 100000]);
   });
 
   test('TC_API_14 view one job and an unknown id', async ({ api }) => {
     const job = await api.createJob();
     const found = await api.get(`/jobs/${job.id}`);
-    expect.soft(found.status()).toBe(200);
-    expect.soft((await json<JobDto>(found)).title).toBe(job.title);
-    const missing = await api.get('/jobs/99999999');
-    expect.soft(missing.status()).toBe(404);
+    expect.soft(found.status(), 'existing job').toBe(200);
+    expect.soft((await json<JobDto>(found)).title, 'title').toBe(job.title);
+    const missing = await api.get(`/jobs/${NON_EXISTENT_ID}`);
+    expect.soft(missing.status(), 'unknown id').toBe(404);
   });
 
   test('TC_API_15 employer creates a job and owns it', async ({ api }) => {
     const payload = makeJob();
     const res = await api.post('/jobs', { role: 'employer', data: payload });
-    expect(res.status()).toBe(201);
+    expect(res.status(), 'status').toBe(201);
     const { job } = await json<{ job: JobDto }>(res);
-    expect(job.title).toBe(payload.title);
-    expect(job.employer_id).toBe(await api.seedUserId('employer'));
+    expect.soft(job.title, 'title').toBe(payload.title);
+    expect.soft(job.employer_id, 'owner').toBe(api.seedId('employer'));
   });
 
   test('TC_API_16 create a job with missing fields or wrong role', async ({ api }) => {
@@ -64,7 +66,7 @@ test.describe('API - jobs', () => {
     const newTitle = `${job.title} updated`;
     const owner = await api.put(`/jobs/${job.id}`, { role: 'employer', data: { title: newTitle } });
     expect.soft(owner.status(), 'owner').toBe(200);
-    expect.soft((await json<{ job: JobDto }>(owner)).job.title).toBe(newTitle);
+    expect.soft((await json<{ job: JobDto }>(owner)).job.title, 'new title').toBe(newTitle);
     const other = await api.put(`/jobs/${job.id}`, { role: 'employer2', data: { title: 'hijacked' } });
     expect.soft(other.status(), 'other employer').toBe(403);
   });
@@ -72,13 +74,37 @@ test.describe('API - jobs', () => {
   test('TC_API_18 delete a job', async ({ api }) => {
     const job = await api.createJob();
     const del = await api.del(`/jobs/${job.id}`, { role: 'employer' });
-    expect(del.status()).toBe(200);
+    expect(del.status(), 'delete').toBe(200);
     const after = await api.get(`/jobs/${job.id}`);
-    expect(after.status()).toBe(404);
+    expect(after.status(), 'get after delete').toBe(404);
   });
 
-  test('TC_API_19 create a job with an invalid job type', async ({ api }) => {
-    const res = await api.post('/jobs', { role: 'employer', data: makeJob({ job_type: 'not-a-real-type' }) });
-    expect(res.status()).toBe(400);
-  });
+  test(
+    'TC_API_19 create a job with an invalid job type',
+    { annotation: { type: 'bug', description: 'BUG-02: Invalid job_type returns 500 instead of 400' } },
+    async ({ api }) => {
+      const res = await api.post('/jobs', { role: 'employer', data: makeJob({ job_type: 'not-a-real-type' }) });
+      expect(res.status()).toBe(400);
+    },
+  );
+
+  test(
+    'TC_API_25 employer cannot create a job as another employer',
+    {
+      annotation: {
+        type: 'bug',
+        description: 'BUG-04: employer_id in the body lets an employer post a job as another employer',
+      },
+    },
+    async ({ api }) => {
+      const victimId = api.seedId('employer2');
+      const res = await api.post('/jobs', { role: 'employer', data: makeJob({ employer_id: victimId }) });
+
+      expect.soft([201, 403], 'status').toContain(res.status());
+      if (res.status() === 201) {
+        const { job } = await json<{ job: JobDto }>(res);
+        expect.soft(job.employer_id, 'job owner').toBe(api.seedId('employer'));
+      }
+    },
+  );
 });

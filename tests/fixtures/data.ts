@@ -1,4 +1,5 @@
 import { TEST_PREFIX } from './env';
+import type { Role } from './types';
 
 let counter = 0;
 
@@ -9,16 +10,18 @@ export function uniqueId(): string {
 
 export const DEFAULT_PASSWORD = 'Test@123';
 
+export const NON_EXISTENT_ID = 99_999_999;
+
 export interface NewUser {
   full_name: string;
   email: string;
   password: string;
-  role: string;
+  role: Role;
   company?: string;
   phone?: string;
 }
 
-export function makeUser(role: string = 'jobseeker', overrides: Partial<NewUser> = {}): NewUser {
+export function makeUser(role: Role = 'jobseeker', overrides: Partial<NewUser> = {}): NewUser {
   const id = uniqueId();
   return {
     full_name: `${TEST_PREFIX}${role}_${id}`,
@@ -59,4 +62,8 @@ export function makeJob(overrides: Partial<NewJob> = {}): NewJob {
     salary_max: 60000,
     ...overrides,
   };
+}
+
+export function uniqueCategory(): string {
+  return `${TEST_PREFIX}cat_${uniqueId()}`;
 }

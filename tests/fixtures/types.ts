@@ -1,8 +1,10 @@
+export type Role = 'admin' | 'employer' | 'jobseeker';
+
 export interface UserDto {
   id: number;
   full_name: string;
   email: string;
-  role: string;
+  role: Role;
   company?: string | null;
 }
 
@@ -57,6 +59,11 @@ export interface StatsResponse {
   companies: number;
   total_applications: number;
   registered_jobseekers: number;
+}
+
+export interface HealthResponse {
+  status: string;
+  database: string;
 }
 
 export interface ErrorResponse {
